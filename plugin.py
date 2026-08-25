@@ -31,7 +31,9 @@ def register(api):
     options = [CUSTOM_LABEL] + presets
     default_preset = presets[0] if presets else CUSTOM_LABEL
 
-    api.add_setting('preset', '预设水印图 (Preset)', 'select', default_preset, options=options)
+    gallery_options = [{'label': fn, 'image': os.path.join(PRESETS_DIR, fn)} for fn in presets]
+    gallery_options.append({'label': '自定义', 'image': None})
+    api.add_setting('preset', '预设水印图 (Preset)', 'gallery', default_preset, options=gallery_options)
     api.add_setting('image', '自定义图片文件 (Custom file)', 'file', '')
     api.add_setting('size', '水印大小 % 宽 (Size)', 'range', 15, min=2, max=60, step=1)
     api.add_setting('offset_x', '水平位置 % (X offset)', 'range', 50, min=0, max=100, step=1)
