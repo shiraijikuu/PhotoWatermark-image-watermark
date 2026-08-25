@@ -8,6 +8,7 @@ import os
 from PIL import Image
 
 PLUGIN_NAME = 'image-watermark'
+PLUGIN_VERSION = '1.0.0'
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PRESETS_DIR = os.path.join(_HERE, 'presets')
 CUSTOM_LABEL = '自定义文件'
