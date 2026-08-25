@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""图片水印插件：上传自定义图片作为水印（支持 PNG/JPG/GIF）。
+"""图片水印插件：上传自定义图片作为水印，内置预设水印图（支持 PNG/JPG/GIF）。
 - GIF 等动图只取第一帧（静态水印，不播放动画）
 - 仅用于普通图片，RAW 自动跳过（避免加载过久）
 - 大小 / 位置(X,Y偏移) / 旋转 / 不透明度 用滑块调整（「导出」页 -> 「插件设置」）
@@ -8,11 +8,31 @@ import os
 from PIL import Image
 
 PLUGIN_NAME = 'image-watermark'
+_HERE = os.path.dirname(os.path.abspath(__file__))
+PRESETS_DIR = os.path.join(_HERE, 'presets')
+CUSTOM_LABEL = '自定义文件'
+
+
+def _list_presets():
+    """列出预设目录里的图片（presets/）"""
+    names = []
+    if os.path.isdir(PRESETS_DIR):
+        try:
+            for fn in sorted(os.listdir(PRESETS_DIR)):
+                if fn.lower().endswith(('.gif', '.png', '.jpg', '.jpeg', '.bmp', '.webp')):
+                    names.append(fn)
+        except Exception:
+            pass
+    return names
 
 
 def register(api):
-    # 注册插件设置项（滑块调整，保存到 config.json）
-    api.add_setting('image', '水印图片文件 (PNG/JPG/GIF)', 'file', '')
+    presets = _list_presets()
+    options = [CUSTOM_LABEL] + presets
+    default_preset = presets[0] if presets else CUSTOM_LABEL
+
+    api.add_setting('preset', '预设水印图 (Preset)', 'select', default_preset, options=options)
+    api.add_setting('image', '自定义图片文件 (Custom file)', 'file', '')
     api.add_setting('size', '水印大小 % 宽 (Size)', 'range', 15, min=2, max=60, step=1)
     api.add_setting('offset_x', '水平位置 % (X offset)', 'range', 50, min=0, max=100, step=1)
     api.add_setting('offset_y', '垂直位置 % (Y offset)', 'range', 88, min=0, max=100, step=1)
@@ -25,7 +45,12 @@ def register(api):
             return img
 
         vals = (settings.get('plugin_values') or {}).get(PLUGIN_NAME, {})
-        path = str(vals.get('image', '') or '').strip()
+        # 选预设 或 自定义文件
+        preset = str(vals.get('preset', '') or '')
+        if preset and preset != CUSTOM_LABEL:
+            path = os.path.join(PRESETS_DIR, preset)
+        else:
+            path = str(vals.get('image', '') or '').strip()
         if not path or not os.path.exists(path):
             return img
 
