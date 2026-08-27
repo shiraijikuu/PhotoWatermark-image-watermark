@@ -7,8 +7,16 @@
 import os
 from PIL import Image
 
+import photo
+try:
+    import app
+    _FONTS_DIR = app.FONTS_DIR
+except Exception:  # 极端加载顺序：回退默认字体目录
+    app = None
+    _FONTS_DIR = None
+
 PLUGIN_NAME = 'image-watermark'
-PLUGIN_VERSION = '1.1.0'
+PLUGIN_VERSION = '1.2.0'
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PRESETS_DIR = os.path.join(_HERE, 'presets')
 CUSTOM_LABEL = '自定义文件'
@@ -41,6 +49,9 @@ def register(api):
     api.add_setting('offset_y', '垂直位置 % (Y offset)', 'range', 88, min=0, max=100, step=1)
     api.add_setting('rotation', '旋转角度 (Rotation)', 'range', 0, min=-180, max=180, step=1)
     api.add_setting('opacity', '不透明度 0-100 (Opacity)', 'range', 100, min=0, max=100, step=1)
+    api.add_setting('layout', '与文字对齐 (Align with text)', 'select', default='none',
+                    options=['none', 'left-right', 'right-left', 'top-bottom', 'bottom-top'])
+    api.add_setting('gap', '间距 %宽 (Gap)', 'range', 1.5, min=0, max=10, step=0.1)
 
     def render(img, settings, values):
         # RAW 不加水印，避免加载过久
@@ -87,17 +98,47 @@ def register(api):
             alpha = logo.split()[3].point(lambda x: int(x * opacity))
             logo.putalpha(alpha)
 
-        # 位置：0-100 百分比（0=左/上，50=居中，100=右/下）
         w, h = logo.size
-        ox = max(0.0, min(100.0, fval('offset_x', 50)))
-        oy = max(0.0, min(100.0, fval('offset_y', 88)))
-        x = int((img.width - w) * ox / 100.0)
-        y = int((img.height - h) * oy / 100.0)
-        x = max(0, min(img.width - w, x))
-        y = max(0, min(img.height - h, y))
-
-        img = img.convert('RGB')
-        img.paste(logo, (x, y), logo)
+        # ---- 文字-图片组合布局：优先与文字水印对齐/对称/间距 ----
+        # 仅默认文字水印模式（主程序已画文字水印）生效；越界自动回退独立定位。
+        layout = str(vals.get('layout', 'none') or 'none')
+        gap_px = img.width * fval('gap', 1.5) / 100.0
+        rect = None
+        try:
+            rect = photo.watermark_rect(img, settings, values, fonts_dir=_FONTS_DIR)
+        except Exception:
+            rect = None
+        placed = False
+        if layout != 'none' and rect:
+            tx0, ty0, tx1, ty1 = rect
+            tw, th = tx1 - tx0, ty1 - ty0
+            if layout == 'left-right':        # 文字左，logo 右，垂直居中
+                x = tx1 + gap_px
+                y = ty0 + (th - h) / 2.0
+            elif layout == 'right-left':      # logo 左，文字右，垂直居中
+                x = tx0 - gap_px - w
+                y = ty0 + (th - h) / 2.0
+            elif layout == 'top-bottom':      # 文字上，logo 下，水平居中
+                x = tx0 + (tw - w) / 2.0
+                y = ty1 + gap_px
+            else:                             # bottom-top：logo 上，文字下，水平居中
+                x = tx0 + (tw - w) / 2.0
+                y = ty0 - gap_px - h
+            # 越界安全：组合超出画面则回退独立定位，避免 logo 出界
+            if 0 <= x and 0 <= y and x + w <= img.width and y + h <= img.height:
+                img = img.convert('RGB')
+                img.paste(logo, (int(round(x)), int(round(y))), logo)
+                placed = True
+        if not placed:
+            # 原独立定位逻辑（offset_x/offset_y 百分比），保持现状
+            ox = max(0.0, min(100.0, fval('offset_x', 50)))
+            oy = max(0.0, min(100.0, fval('offset_y', 88)))
+            x = int((img.width - w) * ox / 100.0)
+            y = int((img.height - h) * oy / 100.0)
+            x = max(0, min(img.width - w, x))
+            y = max(0, min(img.height - h, y))
+            img = img.convert('RGB')
+            img.paste(logo, (x, y), logo)
         return img
 
     api.add_watermark_style('image_watermark', '图片水印（插件）', render)
