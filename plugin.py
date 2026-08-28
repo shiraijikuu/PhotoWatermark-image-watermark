@@ -17,10 +17,12 @@ except Exception:
     _FONTS_DIR = None
 
 PLUGIN_NAME = 'image-watermark'
-PLUGIN_VERSION = '1.3.0'
+PLUGIN_VERSION = '1.4.0'
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PRESETS_DIR = os.path.join(_HERE, 'presets')
 CUSTOM_LABEL = '自定义文件'
+DLC_MANIFEST_URL = 'https://cdn.jsdelivr.net/gh/shiraijikuu/PhotoWatermark-dlc-assets@main/dji-models.json'
+DLC_SUBDIR = 'dji'   # 下载到 presets/dji/
 MAX_WATERMARKS = 5
 
 # layout 旧值→新值（汉化）映射
@@ -38,15 +40,19 @@ _IMG_CACHE = {}
 
 
 def _list_presets():
-    names = []
+    """递归扫描 presets 目录（支持 DLC 子目录），返回相对 presets 的路径列表。"""
+    items = []
     if os.path.isdir(PRESETS_DIR):
         try:
-            for fn in sorted(os.listdir(PRESETS_DIR)):
-                if fn.lower().endswith(('.gif', '.png', '.jpg', '.jpeg', '.bmp', '.webp')):
-                    names.append(fn)
+            for root, _dirs, files in os.walk(PRESETS_DIR):
+                for fn in sorted(files):
+                    if fn.lower().endswith(('.gif', '.png', '.jpg', '.jpeg', '.bmp', '.webp')):
+                        full = os.path.join(root, fn)
+                        rel = os.path.relpath(full, PRESETS_DIR).replace('\\', '/')
+                        items.append(rel)
         except Exception:
             pass
-    return names
+    return sorted(items)
 
 
 def _load_image(path):
@@ -196,12 +202,14 @@ def _render_one(img, vals, i, settings, values, is_first):
 def register(api):
     presets = _list_presets()
     default_preset = presets[0] if presets else CUSTOM_LABEL
-    gallery_options = [{'label': fn, 'image': os.path.join(PRESETS_DIR, fn)} for fn in presets]
+    gallery_options = [{'label': os.path.basename(rel), 'image': os.path.join(PRESETS_DIR, rel),
+                        'value': rel} for rel in presets]
     gallery_options.append({'label': '自定义', 'image': None})
 
     # ---- 共用设置 ----
     api.add_setting('_hdr_common', '共用设置', 'header', '')
-    api.add_setting('count', '水印数量', 'range', 1, min=1, max=MAX_WATERMARKS, step=1)
+    api.add_setting('count', '水印数量', 'select', default='1',
+                    options=[str(n) for n in range(1, MAX_WATERMARKS + 1)])
     api.add_setting('layout', '与文字对齐（仅水印1）', 'select', default='无',
                     options=_LAYOUT_OPTIONS)
     api.add_setting('gap', '与文字间距 %宽', 'range', 1.5, min=0, max=10, step=0.1)
@@ -226,4 +234,5 @@ def register(api):
             img = _render_one(img, vals, i, settings, values, is_first=(i == 1))
         return img
 
+    api.add_dlc_source(PLUGIN_NAME, '添加更多水印…', DLC_MANIFEST_URL, DLC_SUBDIR)
     api.add_watermark_style('image_watermark', '图片水印（插件）', render)
