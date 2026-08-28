@@ -16,7 +16,7 @@ except Exception:  # 极端加载顺序：回退默认字体目录
     _FONTS_DIR = None
 
 PLUGIN_NAME = 'image-watermark'
-PLUGIN_VERSION = '1.2.0'
+PLUGIN_VERSION = '1.2.1'
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PRESETS_DIR = os.path.join(_HERE, 'presets')
 CUSTOM_LABEL = '自定义文件'
@@ -100,7 +100,14 @@ def register(api):
 
         w, h = logo.size
         # ---- 文字-图片组合布局：优先与文字水印对齐/对称/间距 ----
-        # 仅默认文字水印模式（主程序已画文字水印）生效；越界自动回退独立定位。
+        # 仅默认文字水印模式（主程序已画文字水印）生效。
+        # 透明 logo 用 getbbox() 不透明内容区计算间距（透明边缘不干扰对齐）；
+        # 越界时先翻到反方向（文字与 logo 始终成对），双向放不下再与文字中心对齐 clamp 贴边。
+        content = logo.getbbox() or (0, 0, w, h)     # 不透明内容区域
+        cw = content[2] - content[0]
+        ch = content[3] - content[1]
+        cxo, cyo = content[0], content[1]            # 内容在画布内的偏移
+
         layout = str(vals.get('layout', 'none') or 'none')
         gap_px = img.width * fval('gap', 1.5) / 100.0
         rect = None
@@ -108,24 +115,53 @@ def register(api):
             rect = photo.watermark_rect(img, settings, values, fonts_dir=_FONTS_DIR)
         except Exception:
             rect = None
-        placed = False
-        if layout != 'none' and rect:
+
+        def _place(dirn, gpx):
+            """按方向计算 logo 画布左上角（内容与文字边缘相距 gpx）。返回 (x,y) 或 None。"""
+            if not rect:
+                return None
             tx0, ty0, tx1, ty1 = rect
             tw, th = tx1 - tx0, ty1 - ty0
-            if layout == 'left-right':        # 文字左，logo 右，垂直居中
-                x = tx1 + gap_px
-                y = ty0 + (th - h) / 2.0
-            elif layout == 'right-left':      # logo 左，文字右，垂直居中
-                x = tx0 - gap_px - w
-                y = ty0 + (th - h) / 2.0
-            elif layout == 'top-bottom':      # 文字上，logo 下，水平居中
-                x = tx0 + (tw - w) / 2.0
-                y = ty1 + gap_px
-            else:                             # bottom-top：logo 上，文字下，水平居中
-                x = tx0 + (tw - w) / 2.0
-                y = ty0 - gap_px - h
-            # 越界安全：组合超出画面则回退独立定位，避免 logo 出界
+            if dirn == 'left-right':      # 文字左 logo 右，内容垂直居中
+                x = tx1 + gpx - cxo
+                y = ty0 + (th - ch) / 2.0 - cyo
+            elif dirn == 'right-left':    # logo 左 文字右
+                x = tx0 - gpx - cw - cxo
+                y = ty0 + (th - ch) / 2.0 - cyo
+            elif dirn == 'top-bottom':    # 文字上 logo 下，内容水平居中
+                x = tx0 + (tw - cw) / 2.0 - cxo
+                y = ty1 + gpx - cyo
+            else:                         # bottom-top：logo 上 文字下
+                x = tx0 + (tw - cw) / 2.0 - cxo
+                y = ty0 - gpx - ch - cyo
             if 0 <= x and 0 <= y and x + w <= img.width and y + h <= img.height:
+                return (x, y)
+            return None
+
+        placed = False
+        if layout != 'none' and rect:
+            # 依次尝试：原方向 → 反方向（保证文字与 logo 不重叠、始终成对）
+            FLIP = {'left-right': 'right-left', 'right-left': 'left-right',
+                    'top-bottom': 'bottom-top', 'bottom-top': 'top-bottom'}
+            for dirn in (layout, FLIP.get(layout, layout)):
+                p = _place(dirn, gap_px)
+                if p:
+                    img = img.convert('RGB')
+                    img.paste(logo, (int(round(p[0])), int(round(p[1]))), logo)
+                    placed = True
+                    break
+            if not placed:
+                # 双向都放不下（如文字居中且 logo 过大）：与文字中心对齐后 clamp 贴边
+                tx0, ty0, tx1, ty1 = rect
+                tw, th = tx1 - tx0, ty1 - ty0
+                if layout in ('left-right', 'right-left'):
+                    x = tx0 + tw / 2.0 - cw / 2.0 - cxo     # 与文字水平中心对齐
+                    y = ty0 + (th - ch) / 2.0 - cyo
+                else:
+                    x = tx0 + (tw - cw) / 2.0 - cxo
+                    y = ty0 + th / 2.0 - ch / 2.0 - cyo
+                x = max(0, min(img.width - w, x))
+                y = max(0, min(img.height - h, y))
                 img = img.convert('RGB')
                 img.paste(logo, (int(round(x)), int(round(y))), logo)
                 placed = True
