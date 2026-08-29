@@ -1,7 +1,7 @@
-# PhotoWatermark - image-watermark plugin / 图片水印插件
+# camera-watermark - image-watermark plugin / 图片水印插件
 
-**EN:** A plugin for Photo Watermark that stamps a custom image as a watermark.
-**中文：** 给 Photo Watermark 添加"自定义图片水印"的插件。
+**EN:** A plugin for camera-watermark that stamps a custom image as a watermark.
+**中文：** 给 camera-watermark 添加"自定义图片水印"的插件。
 
 ## Features / 功能
 
@@ -14,7 +14,7 @@
 ## Install / 安装
 
 1. Download this plugin folder / 下载本插件文件夹
-2. Put it into the plugins/ directory next to PhotoWatermark.exe / 放入 PhotoWatermark.exe 旁的 plugins/ 目录
+2. Put it into the plugins/ directory next to camera-watermark.exe / 放入 camera-watermark.exe 旁的 plugins/ 目录
 3. Restart the app / 重启软件
 
 ## Usage / 使用

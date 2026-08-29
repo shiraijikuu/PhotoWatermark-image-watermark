@@ -21,7 +21,7 @@ PLUGIN_VERSION = '1.4.0'
 _HERE = os.path.dirname(os.path.abspath(__file__))
 PRESETS_DIR = os.path.join(_HERE, 'presets')
 CUSTOM_LABEL = '自定义文件'
-DLC_MANIFEST_URL = 'https://cdn.jsdelivr.net/gh/shiraijikuu/PhotoWatermark-dlc-assets@main/dji-models.json'
+DLC_MANIFEST_URL = 'https://cdn.jsdelivr.net/gh/shiraijikuu/camera-watermark-dlc-assets@main/dji-models.json'
 DLC_SUBDIR = 'dji'   # 下载到 presets/dji/
 MAX_WATERMARKS = 5
 
