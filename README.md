@@ -26,3 +26,6 @@
 ## License / 许可证
 
 MIT (LICENSE)
+
+## Presets / 预设
+- Phone brand logos (14 brands, white/transparent) / 手机品牌 logo（14 家，白/透明版）
